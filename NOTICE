@@ -1,0 +1,97 @@
+img2glb — 제3자 구성요소 고지
+================================
+
+이 저장소의 코드는 MIT 라이선스다 (LICENSE 참조).
+다만 실행 시 아래 제3자 모델·라이브러리를 내려받아 사용한다.
+**배포·서비스 전에 각 항목의 조건을 확인할 것.**
+
+--------------------------------------------------------------------------
+백엔드 공통
+--------------------------------------------------------------------------
+
+BiRefNet  (ZhengPeng7/BiRefNet)
+  MIT License. 배경 제거 기본 백엔드. 지역 제한 없음, gated 아님.
+
+rembg / U-2-Net  (선택)
+  rembg: MIT / U-2-Net: Apache-2.0. `--bg-method u2net` 에서만 쓴다.
+
+PyTorch, trimesh, Pillow, NumPy    — BSD / MIT / Apache-2.0
+
+--------------------------------------------------------------------------
+백엔드: trellis2  (--model trellis2, 기본)
+--------------------------------------------------------------------------
+
+TRELLIS.2  (microsoft/TRELLIS.2, microsoft/TRELLIS.2-4B)
+  MIT License. 지역 제한 없음.
+
+DINOv3  (facebook/dinov3-vitl16-pretrain-lvd1689m)
+  Meta DINOv3 License. 이미지 인코더로 사용된다.
+  * 상업적 사용 허용, 지역 제한 없음
+  * HuggingFace 접근 승인 필요 (gated: manual)
+  * **요구사항: 제품/웹사이트/문서에 "Built with DINOv3" 를 명확히 표시**
+  * 인코더를 제3자에게 재배포하면 라이선스 사본을 함께 제공
+  * 금지: 리버스 엔지니어링, ITAR 대상 활동, 군사·핵·무기 용도
+  https://ai.meta.com/resources/models-and-libraries/dinov3-license
+
+CuMesh, FlexGEMM  (JeffreyXiang)   — MIT
+o-voxel                            — MIT (eigen 포함, MPL-2.0)
+utils3d  (EasternJournalist)       — MIT
+
+--------------------------------------------------------------------------
+백엔드: spar3d  (--model spar3d)
+--------------------------------------------------------------------------
+
+SPAR3D  (stabilityai/stable-point-aware-3d, Stability-AI/stable-point-aware-3d)
+  **Stability AI Community License** — MIT 가 아니다. 가중치와 저장소 코드
+  (vendored 된 texture_baker / uv_unwrapper 포함) 모두 이 조건이 적용된다.
+  * 연구·비상업 용도: 무상 허용
+  * 상업적 사용: **연매출 100만 달러 미만** 조직만 무상. 그 이상은
+    Stability AI 와 별도 엔터프라이즈 계약 필요
+  * HuggingFace 접근 승인 필요 (gated)
+  * **요구사항: 배포 시 "Powered by Stability AI" 표시 및 라이선스 사본 첨부**
+  * 산출물(생성된 3D 에셋)에 대한 제약은 별도 확인할 것
+  https://huggingface.co/stabilityai/stable-point-aware-3d/blob/main/LICENSE.md
+
+  즉 **spar3d 백엔드는 trellis2 와 달리 무조건 상업 배포가 가능하지 않다.**
+  제약 없는 상업 배포가 필요하면 trellis2(MIT) 를 쓸 것.
+
+DINOv2  (facebook/dinov2-large)
+  Apache-2.0. 이미지 인코더. gated 아니고 표기 의무도 없다.
+  (trellis2 가 쓰는 DINOv3 와 달리 조건이 느슨하다)
+
+Alpha-CLIP  (SunzeY/AlphaCLIP)     — Apache-2.0
+CLIP        (openai/CLIP)          — MIT. 가중치 ViT-L/14@336px 도 MIT.
+  머티리얼(metallic/roughness) 추정 헤드가 쓴다.
+
+bvh_article (uv_unwrapper 에 vendored) — Unlicense (public domain)
+
+gpytoolbox / pynanoinstantmeshes  (선택, 리메시)
+  각각 MIT / BSD-3-Clause. aarch64 휠이 없어 기본 설치에서 제외한다.
+
+--------------------------------------------------------------------------
+의도적으로 사용하지 않는 구성요소
+--------------------------------------------------------------------------
+
+transparent-background  (SPAR3D 기본 배경제거)
+  MIT 이지만 설치하지 않는다. 배경 제거는 백엔드와 무관하게
+  img2glb.bg (BiRefNet) 가 담당한다는 설계 원칙 때문이며,
+  scripts/apply_patches.py --spar3d 가 해당 import 를 선택적으로 바꾼다.
+
+nvdiffrast  (NVlabs)
+  Nvidia Source Code License (1-Way Commercial) — **비상업 전용**.
+  TRELLIS.2 원본은 to_glb 의 UV 공간 래스터화에 이를 쓴다.
+  본 저장소는 이를 자체 구현(src/img2glb/raster, MIT)으로 대체하며,
+  scripts/apply_patches.py 가 해당 의존을 제거한다.
+  비교 목적으로 되돌리려면 OVOXEL_RASTERIZER=nvdiffrast 를 지정한다
+  (그 경우 NVIDIA 비상업 조건이 적용된다).
+
+briaai/RMBG-2.0
+  CC BY-NC 4.0 — **비상업 전용**. TRELLIS.2 의 pipeline.json 이 지정하는
+  기본 배경제거 모델이다. 참고로 TRELLIS.2 의 래퍼 코드 자체는 MIT 인
+  ZhengPeng7/BiRefNet 을 기본값으로 두고 있고, 설정 파일이 이를 덮어쓴다.
+  본 CLI 는 RMBG-2.0 로드를 **코드 수준에서 차단**하며 우회 옵션을 제공하지
+  않는다. 배경 제거는 MIT 원본 BiRefNet 으로 수행한다.
+
+nvdiffrec
+  NVIDIA Source Code License. HDRI 프리뷰 렌더 전용이며 GLB 생성에 불필요하다.
+  본 저장소는 설치하지 않는다.
