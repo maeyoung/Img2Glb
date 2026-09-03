@@ -33,7 +33,7 @@ dev = ["pytest"]
 img2glb = "img2glb.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/KETI/img2glb"
+Homepage = "https://github.com/maeyoung/Img2Glb"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
