@@ -21,6 +21,7 @@ o_voxel 은 site-packages 에 복사본으로 설치되므로 그쪽에도 반�
 멱등하게 동작하므로 여러 번 실행해도 안전하다.
 """
 import argparse
+import importlib.util
 import io
 import shutil
 import sys
@@ -149,15 +150,21 @@ def patch_ovoxel(root: Path) -> bool:
 
 
 def sync_installed_ovoxel(root: Path) -> bool:
-    """site-packages 의 o_voxel 복사본에도 반영한다."""
-    try:
-        import o_voxel
-    except ImportError:
+    """site-packages 의 o_voxel 복사본에도 반영한다.
+
+    ``import o_voxel`` 로 경로를 찾으면 안 된다. 패치 전 복사본은 최상단에서
+    nvdiffrast 를 import 하므로, 바로 그 이유로 import 가 실패해 동기화가
+    조용히 건너뛰어진다. find_spec 은 모듈을 실행하지 않고 위치만 알려준다.
+    """
+    spec = importlib.util.find_spec("o_voxel")
+    if spec is None or not spec.origin:
         print("  o_voxel 이 설치되어 있지 않아 동기화를 건너뜁니다.")
         return False
-    dst = Path(o_voxel.__file__).parent / "postprocess.py"
+    dst = Path(spec.origin).parent / "postprocess.py"
     src = root / "o-voxel/o_voxel/postprocess.py"
-    if dst.resolve() == src.resolve():
+    if not dst.is_file() or dst.resolve() == src.resolve():
+        return False
+    if _read(dst) == _read(src):
         return False
     _backup(dst)
     shutil.copy2(src, dst)
