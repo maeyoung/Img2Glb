@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""백엔드 저장소에 img2glb 용 패치를 적용한다.
-
-TRELLIS.2
----------
+"""TRELLIS.2 저장소에 img2glb 용 패치를 적용한다.
 
 세 가지를 고친다.
 
@@ -20,14 +17,6 @@ TRELLIS.2
    DINOv3 레이어 경로가 ``model.layer`` 에서 ``model.model.layer`` 로 바뀌었다.
 
 o_voxel 은 site-packages 에 복사본으로 설치되므로 그쪽에도 반영한다.
-
-SPAR3D
-------
-
-1. **transparent_background 의존 제거**
-   ``spar3d/utils.py`` 가 모듈 최상단에서 ``Remover`` 를 import 하는데,
-   img2glb 는 배경제거를 자체 모듈(BiRefNet, MIT)로 처리하므로 이 패키지를
-   설치하지 않는다. import 를 선택적으로 바꾼다.
 
 멱등하게 동작하므로 여러 번 실행해도 안전하다.
 """
@@ -175,53 +164,20 @@ def sync_installed_ovoxel(root: Path) -> bool:
     return True
 
 
-# ---------------------------------------------------------------- SPAR3D
-
-SPAR3D_REMOVER_IMPORT = """try:
-    from transparent_background import Remover
-except ImportError:  # img2glb 는 배경제거를 자체 모듈(BiRefNet, MIT)로 처리한다
-    Remover = None
-"""
-
-
-def patch_transparent_background(root: Path) -> bool:
-    p = root / "spar3d/utils.py"
-    s = _read(p)
-    old = "from transparent_background import Remover\n"
-    if old not in s:
-        return False
-    _backup(p)
-    _write(p, s.replace(old, SPAR3D_REMOVER_IMPORT, 1))
-    return True
-
-
 def main():
-    ap = argparse.ArgumentParser(description="백엔드 저장소 패치")
-    ap.add_argument("--trellis2", type=Path)
-    ap.add_argument("--spar3d", type=Path)
+    ap = argparse.ArgumentParser(description="TRELLIS.2 저장소 패치")
+    ap.add_argument("--trellis2", required=True, type=Path)
     args = ap.parse_args()
-    if not args.trellis2 and not args.spar3d:
-        ap.error("--trellis2 또는 --spar3d 중 하나는 지정해야 합니다")
 
-    if args.trellis2:
-        root = args.trellis2
-        if not (root / "trellis2").is_dir():
-            sys.exit(f"TRELLIS.2 저장소가 아닙니다: {root}")
-        for label, fn in (("sparse attention (sdpa)", patch_sparse_attention),
-                          ("DINOv3 (transformers 5.x)", patch_dinov3),
-                          ("o_voxel (nvdiffrast 제거)", patch_ovoxel),
-                          ("o_voxel 설치본 동기화", sync_installed_ovoxel)):
-            done = fn(root)
-            print(f"  [{'적용' if done else '이미 적용됨'}] {label}")
-
-    if args.spar3d:
-        root = args.spar3d
-        if not (root / "spar3d").is_dir():
-            sys.exit(f"SPAR3D 저장소가 아닙니다: {root}")
-        for label, fn in (("transparent_background 의존 제거",
-                           patch_transparent_background),):
-            done = fn(root)
-            print(f"  [{'적용' if done else '이미 적용됨'}] {label}")
+    root = args.trellis2
+    if not (root / "trellis2").is_dir():
+        sys.exit(f"TRELLIS.2 저장소가 아닙니다: {root}")
+    for label, fn in (("sparse attention (sdpa)", patch_sparse_attention),
+                      ("DINOv3 (transformers 5.x)", patch_dinov3),
+                      ("o_voxel (nvdiffrast 제거)", patch_ovoxel),
+                      ("o_voxel 설치본 동기화", sync_installed_ovoxel)):
+        done = fn(root)
+        print(f"  [{'적용' if done else '이미 적용됨'}] {label}")
 
     print("패치 완료.")
 

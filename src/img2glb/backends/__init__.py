@@ -4,11 +4,9 @@
 ``BACKENDS`` 에 등록하면 CLI 에 자동으로 노출된다.
 """
 from .base import Backend
-from .spar3d import Spar3dBackend
 from .trellis2 import Trellis2Backend
 
 BACKENDS = {
-    "spar3d": Spar3dBackend,
     "trellis2": Trellis2Backend,
 }
 

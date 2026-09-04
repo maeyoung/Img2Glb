@@ -9,6 +9,10 @@ class Backend(ABC):
     name: str = ""
     description: str = ""
 
+    def __init__(self):
+        # 생성 후 메타데이터에 실릴 정보. generate() 안에서 채운다.
+        self.stats: dict = {}
+
     @staticmethod
     def add_arguments(parser) -> None:
         """백엔드 전용 CLI 옵션을 등록한다 (선택)."""

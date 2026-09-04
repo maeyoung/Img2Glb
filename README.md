@@ -3,32 +3,21 @@
 이미지 한 장에서 **PBR 텍스처가 입혀진 GLB** 를 생성하는 CLI.
 
 ```bash
-img2glb --model trellis2 --image cat.png --output cat.glb
-img2glb --model spar3d   --image cat.png --output cat.glb   # 빠른 쪽
+img2glb --image cat.png --output cat.glb
 ```
 
-백엔드는 두 개다.
-
-| 백엔드 | 모델 | 라이선스 | 생성 시간 | 특징 |
-|---|---|---|---|---|
-| `trellis2` (기본) | [TRELLIS.2-4B](https://github.com/microsoft/TRELLIS.2) | MIT | 75–98 s | 형상·텍스처 품질이 좋다. 20만 면 + 4096² PBR |
-| `spar3d` | [SPAR3D](https://github.com/Stability-AI/stable-point-aware-3d) | **Stability AI Community** | 3–4 s | 20배 빠르고 가볍다. 1만 면 + 1024². 점군도 함께 나온다 |
-
-> **라이선스 주의**: `spar3d` 는 MIT 가 **아니다**. 연구·비상업과 연매출
-> 100만 달러 미만 조직의 상업적 사용까지만 무상이다. 제약 없는 상업 배포가
-> 필요하면 `trellis2` 를 쓸 것. 자세한 내용은 [NOTICE](NOTICE) 참조.
+백엔드는 [TRELLIS.2-4B](https://github.com/microsoft/TRELLIS.2) (MIT) 를 쓴다.
+20만 면 + 4096² PBR 텍스처를 75–98 초에 생성한다.
 
 GLB 는 baseColor + metallicRoughness 텍스처를 포함해 Unreal / Unity 의
-PBR 머티리얼에 그대로 매핑된다 (`spar3d` 는 baseColor + normal, metallic /
-roughness 는 텍스처 대신 머티리얼 스칼라로 추정해 넣는다).
+PBR 머티리얼에 그대로 매핑된다.
 
 ## 특징
 
-- **상업 배포 가능한 라이선스 구성** (`trellis2` 경로) — 원본 TRELLIS.2 는 GLB 생성 경로에서
+- **상업 배포 가능한 라이선스 구성** — 원본 TRELLIS.2 는 GLB 생성 경로에서
   `nvdiffrast`(NVIDIA 비상업) 를 쓴다. 본 저장소는 이를 자체 구현
   ([`src/img2glb/raster`](src/img2glb/raster), MIT) 으로 대체했다.
-  자세한 내용은 [NOTICE](NOTICE) 참조. (`spar3d` 는 모델 자체가
-  Stability AI Community License 라 매출 조건이 붙는다)
+  자세한 내용은 [NOTICE](NOTICE) 참조.
 - **aarch64 / Blackwell 지원** — flash-attn·xformers 휠이 없는 환경을 위해
   sparse attention 에 SDPA 경로를 추가한다.
 - **배경 자동 제거** — 알파 채널이 없는 입력이면 생성 전에 알아서 제거한다.
@@ -49,12 +38,9 @@ cd img2glb
 
 bash scripts/setup_trellis2.sh          # 저장소 clone + 확장 빌드 + 패치
 source models/trellis2/.venv/bin/activate
-
-bash scripts/setup_spar3d.sh            # 또는 이쪽
-source models/spar3d/.venv/bin/activate
 ```
 
-두 스크립트 모두 CUDA 태그와 아키텍처를 자동 판별한다. 필요하면 지정한다.
+CUDA 태그와 아키텍처는 자동 판별한다. 필요하면 지정한다.
 
 ```bash
 bash scripts/setup_trellis2.sh --cuda cu130 --arch 12.1
@@ -62,23 +48,17 @@ bash scripts/setup_trellis2.sh --cuda cu130 --arch 12.1
 
 ### gated 모델 접근 승인
 
-두 백엔드 모두 gated 모델을 쓴다. 최초 1회 필요하다.
+이미지 인코더로 gated 모델을 쓴다. 최초 1회 필요하다.
 
-| 백엔드 | 승인이 필요한 저장소 |
-|---|---|
-| `trellis2` | https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m (이미지 인코더) |
-| `spar3d` | https://huggingface.co/stabilityai/stable-point-aware-3d (모델 가중치) |
+1. https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m 에서 접근 요청
+2. 승인 후 `hf auth login` 으로 토큰 등록
 
-승인 후 `hf auth login` 으로 토큰을 등록한다.
-
-> `trellis2`: 제품에 내장할 경우 **"Built with DINOv3" 표기가 의무**다.
-> `spar3d`: 배포 시 **"Powered by Stability AI" 표기와 라이선스 사본 첨부가
-> 의무**이며 매출 조건이 붙는다. [NOTICE](NOTICE) 참조.
+> 제품에 내장할 경우 **"Built with DINOv3" 표기가 의무**다. [NOTICE](NOTICE) 참조.
 
 ### root 권한이 없는 환경
 
 CUDA 확장 빌드에 Python 개발 헤더가 필요하다.
-`setup_*.sh` 가 헤더가 없으면 deb 를 받아 저장소 루트의 `.localdev/` 에
+`setup_trellis2.sh` 가 헤더가 없으면 deb 를 받아 저장소 루트의 `.localdev/` 에
 풀어 두고, `img2glb` 도 이 경로를 자동으로 찾는다. 수동으로 하려면:
 
 ```bash
@@ -92,18 +72,14 @@ export PYDEV_INCLUDE=$PWD/.localdev/root/usr/include
 
 ```bash
 # 생성 (--output 생략 시 output/glb/<입력이름>.glb)
-img2glb --model trellis2 --image samples/bird.png
-img2glb --model spar3d   --image samples/bird.png
-img2glb -i samples/bird.png -o out/bird.glb --seed 7 --preview
-
-# spar3d: 중간 산출물인 점군도 함께 저장 (out/bird.points.ply)
-img2glb --model spar3d -i samples/bird.png -o out/bird.glb --spar3d-save-points
+img2glb --image samples/bird.png
+img2glb -i samples/bird.png -o out/bird.glb --seed 7
 
 # 배경 제거만 단독 실행
 img2glb remove-bg photo.jpg -o photo_rgba.png
 img2glb remove-bg photo.jpg --method u2net --device cpu
 
-# 확인 (--output 생략 시 output/render/<이름>_preview.png)
+# 확인 (--output 생략 시 GLB 옆에 <이름>_preview.png)
 img2glb preview out/bird.glb --resolution 1024
 img2glb preview out/bird.glb --views 0,45,90 --elev 20
 
@@ -116,47 +92,18 @@ img2glb backends
 
 ### 주요 옵션
 
-공통:
-
 | 옵션 | 기본 | 설명 |
 |---|---|---|
-| `--model` | `trellis2` | 백엔드 (`trellis2` / `spar3d`) |
+| `--model` | `trellis2` | 백엔드 |
 | `--seed` | 2025 | 랜덤 시드 |
 | `--no-remove-bg` | off | 배경 자동 제거를 끈다 (기본은 켜짐) |
 | `--keep-rgba` | off | 배경 제거 결과를 `output/rgba/` 에 남긴다 |
 | `--bg-method` | `birefnet` | 배경제거 방식 (`birefnet` / `u2net`) |
-
-`--model trellis2`:
-
-| 옵션 | 기본 | 설명 |
-|---|---|---|
 | `--pipeline-type` | `1024_cascade` | 복셀 해상도 |
 | `--steps` | 12 | 샘플러 step 수 |
 | `--texture-size` | 4096 | 출력 텍스처 해상도 |
 | `--decimation-target` | 200000 | 최종 메시 목표 면 수 |
 | `--use-rembg` | off | TRELLIS.2 내장 RMBG-2.0 사용 (**비상업 라이선스**) |
-
-`--model spar3d`:
-
-| 옵션 | 기본 | 설명 |
-|---|---|---|
-| `--spar3d-texture-resolution` | 1024 | 텍스처 아틀라스 해상도 |
-| `--spar3d-foreground-ratio` | 1.3 | 전경 크롭 여유 배율 (클수록 여백이 넓다) |
-| `--spar3d-save-points` | off | 중간 산출물 점군을 `.points.ply` 로 저장 |
-| `--spar3d-low-vram` | off | 모듈을 단계별로 올렸다 내려 VRAM 절약 (느려진다) |
-| `--spar3d-remesh` | `none` | 리메시 (`triangle`/`quad`, 아래 참고) |
-| `--spar3d-target-count` | 2000 | 리메시 목표 정점 수 |
-
-> **spar3d 의 metallic 값 주의**: metallic / roughness 는 텍스처가 아니라
-> 머티리얼 스칼라로 나오는데, metallic 헤드가 베타분포의 **mode** 를 쓰는 탓에
-> 0 또는 1 로 튄다 (실측: bird=1.0, human=0.0, doorhandle=0.0).
-> 금속이 아닌 물체가 `metallicFactor=1.0` 로 나오면 엔진에서 거울처럼 보이므로
-> 임포트 후 확인하고 필요하면 0 으로 덮어쓸 것.
-
-> `--spar3d-remesh` 는 `gpytoolbox` / `pynanoinstantmeshes` 가 필요한데
-> **aarch64 에는 휠이 없고 소스 빌드도 실패**한다 (gpytoolbox sdist 에
-> CMakeLists.txt 가 빠져 있다). 그래서 기본 설치에서 제외했고, 지정하면
-> 명시적인 오류로 알려준다. 면 수를 줄여야 하면 후처리로 데시메이션할 것.
 
 **튜닝 요령**: `--pipeline-type` 과 `--steps` 는 기본값을 권장한다. 실측상
 `1536_cascade` 나 `--steps 25` 는 형상은 그대로인데 텍스처가 나빠진다
@@ -183,8 +130,6 @@ img2glb backends
 
 ## 성능 (NVIDIA GB10, 1024×1024 입력)
 
-`--model trellis2`
-
 | 단계 | 시간 | peak GPU |
 |---|---|---|
 | 모델 로드 | ~60 s | — |
@@ -193,29 +138,18 @@ img2glb backends
 
 출력은 약 20만 면 + 4096² baseColor(RGBA) + 4096² metallicRoughness.
 
-`--model spar3d`
-
-| 단계 | 시간 | peak GPU |
-|---|---|---|
-| 모델 로드 | 10–13 s | — |
-| 생성 + 베이킹 | 3–4 s | 10.7 GB |
-
-출력은 약 1만 면 + 1024² baseColor + 1024² normal.
-배경 제거까지 포함한 전체 실행이 20초 안쪽이라 반복 시도에 적합하다.
-
 ## 구조
 
 ```
 img2glb/
 ├── src/img2glb/
 │   ├── cli.py            # 명령줄 진입점
-│   ├── backends/         # 모델 백엔드 (trellis2, spar3d)
+│   ├── backends/         # 모델 백엔드 (trellis2)
 │   ├── bg/               # 배경 제거 (birefnet / u2net)
 │   ├── raster/           # 자체 래스터라이저 (CUDA, MIT)
 │   └── tools/            # preview / inspect
 ├── scripts/
 │   ├── setup_trellis2.sh # 백엔드 설치
-│   ├── setup_spar3d.sh   #   〃
 │   └── apply_patches.py  # 백엔드 저장소 패치 (멱등)
 ├── samples/
 ├── models/               # 백엔드 저장소 (gitignore)
@@ -240,35 +174,78 @@ class MyBackend(Backend):
 
 ## 적용된 패치
 
-`scripts/apply_patches.py` 가 백엔드 저장소에 아래를 적용한다. 멱등이며
+`scripts/apply_patches.py` 가 TRELLIS.2 저장소에 아래를 적용한다. 멱등이며
 원본은 `*.orig` 로 백업된다.
-
-`--trellis2`
 
 1. **sparse attention SDPA 경로** — aarch64 에 flash-attn/xformers 휠이 없다.
 2. **nvdiffrast 제거** — `o_voxel.postprocess` 를 `img2glb.raster` 로 전환.
 3. **transformers 5.x 호환** — DINOv3 레이어 경로 변경 대응.
 
-`--spar3d`
-
-1. **transparent_background 의존 제거** — `spar3d/utils.py` 가 모듈 최상단에서
-   `Remover` 를 import 한다. 배경 제거는 백엔드와 무관하게 `img2glb.bg`
-   (BiRefNet, MIT) 가 담당하므로 이 패키지를 설치하지 않고 import 를
-   선택적으로 바꾼다.
-
 > `o_voxel` 은 site-packages 에 복사본으로 설치되므로 재설치하면 패치가 사라진다.
 > 그때는 `apply_patches.py` 를 다시 실행하면 된다.
 
-### spar3d 에서 핀을 따르지 않는 의존성
+## 메타데이터
 
-저장소 `requirements.txt` 의 핀(`numpy==1.26.4`, `transformers==4.42.3`,
-`trimesh==4.4.1` 등)은 낡아서 aarch64 + torch cu130 조합과 맞지 않는다.
-`setup_spar3d.sh` 는 최신 버전을 쓰되 아래 두 가지만 제약한다.
+생성 시 GLB 옆에 `<이름>.json` 사이드카가 만들어진다 (`--no-metadata` 로 끌 수 있다).
+미리보기 PNG 도 함께 만들어진다 (`--no-preview` 로 끌 수 있다).
+에셋 관리 웹에서 목록을 보여주고 "이 에셋을 쓸지" 판단하는 데 필요한 값만 담는다.
 
-- `transformers<5` — spar3d 가 복사해 둔 DINOv2 구현이 5.x 에서 사라진
-  내부 API(`transformers.pytorch_utils`, `utils.backbone_utils`)를 쓴다.
-- `setuptools<81` — AlphaCLIP 의 `setup.py` 가 `pkg_resources` 를 쓴다.
-  81 에서 제거되어 빌드가 깨진다. 설치도 `--no-build-isolation` 이 필요하다.
+```bash
+img2glb -i samples/mug.png -d "커피 머그컵" --tags "kitchen,container"
+img2glb metadata output/glb/*.glb          # 기존 GLB 에 대해 생성/갱신
+img2glb metadata output/glb/mug.glb --print   # 파일 대신 stdout
+```
+
+### 출력 구조
+
+에셋마다 폴더를 하나씩 만든다. 통째로 옮기거나 업로드하기 쉽도록
+GLB · 메타데이터 · 미리보기가 한곳에 모인다.
+
+```
+output/glb/mug/
+├── mug.glb
+├── mug.json
+└── mug_preview.png
+```
+
+`--output` 을 직접 주면 그 경로를 그대로 쓰고, 미리보기와 JSON 은 그 옆에 놓인다.
+
+### 설계 원칙
+
+- **표준 명칭** — 일반 메타데이터는 [schema.org](https://schema.org/3DModel)
+  (CreativeWork/MediaObject), 머티리얼은 glTF 2.0 스펙 이름을 그대로 쓴다.
+  전부 camelCase.
+- **평탄한 구조** — 중첩이 없어 DB 컬럼에 그대로 매핑된다.
+  배열은 `keywords`, `dimensionsNormalized`, `dominantColors` 뿐이다.
+- **측정값만** — 임계값으로 분류한 등급이나 추정치는 넣지 않는다.
+  "high-poly" 같은 구분이 필요하면 웹에서 `triangleCount` 로 판단한다.
+- **설명은 사용자 몫** — 자동 생성하지 않는다. 없으면 `""` 다.
+
+### 필드
+
+| 필드 | 출처 | 용도 |
+|---|---|---|
+| `identifier`, `name`, `description`, `keywords`, `dateCreated` | schema.org | 목록·검색 |
+| `contentUrl`, `contentSize`, `encodingFormat`, `thumbnailUrl`, `sha256` | schema.org | 파일·썸네일·중복 검출 |
+| `triangleCount`, `vertexCount`, `degenerateTriangleCount` | 실측 | 렌더 예산 |
+| `isWatertight`, `hasUv`, `hasNormals` | 실측 | 용도 적합성 |
+| `surfaceArea`, `boundingSphereRadius`, `dimensionsNormalized` | 실측 | 크기·비율 |
+| `primitiveCount`, `materialCount`, `textureCount` | glTF 구조 | 드로우콜 |
+| `alphaMode`, `doubleSided`, `metallicFactor`, `roughnessFactor` | glTF 2.0 | 파이프라인 호환 |
+| `baseColorTextureSize`, `metallicRoughnessTextureSize`, `normalTextureSize` | glTF 2.0 | VRAM 판단 |
+| `metallicAverage`, `roughnessAverage`, `dominantColors` | 실측 | 외형 필터 |
+| `backend`, `modelId`, `seed`, `sourceImage`, `sourceImageSha256` | 생성 이력 | 재현·추적 |
+
+주의할 점 몇 가지.
+
+- **`dimensionsNormalized` 는 실제 치수가 아니다.** 생성 모델이 단위 큐브에 맞춰
+  출력하므로 비율일 뿐이다. 웹에서 "가로 1m" 처럼 표시하면 안 된다.
+- **`metallicAverage` 와 `metallicFactor` 는 다른 값이다.** 전자는 텍스처를 표면에서
+  실측한 평균, 후자는 glTF 가 텍스처에 곱하는 배율이다.
+  평균은 UV 아틀라스 전체가 아니라 정점 UV 위치에서만 샘플한다
+  (차트 사이 빈 공간이 섞이면 실제 표면 값과 달라진다).
+- **`alphaMode` 가 `OPAQUE` 면 알파 채널은 무시된다.** baseColor 텍스처가 RGBA 라도
+  렌더러는 불투명하게 그린다. 투명 여부는 이 필드로 판단한다.
 
 ## 문제 해결
 

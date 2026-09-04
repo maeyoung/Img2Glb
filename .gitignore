@@ -4,6 +4,9 @@
 # 생성 결과물
 /output/
 
+# 테스트용 입력 이미지
+/samples/
+
 # 파이썬
 __pycache__/
 *.py[cod]

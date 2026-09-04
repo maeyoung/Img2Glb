@@ -103,7 +103,8 @@ class Trellis2Backend(Backend):
         t0 = time.time()
         pipeline = Trellis2ImageTo3DPipeline.from_pretrained(args.model_id)
         pipeline.cuda()
-        print(f"[load] 완료 ({time.time() - t0:.1f}s)")
+        load_sec = time.time() - t0
+        print(f"[load] 완료 ({load_sec:.1f}s)")
 
         sampler = {"steps": args.steps, "guidance_strength": args.shape_guidance}
         print(f"[gen] pipeline_type={args.pipeline_type} steps={args.steps}")
@@ -117,7 +118,8 @@ class Trellis2Backend(Backend):
             shape_slat_sampler_params=sampler,
             tex_slat_sampler_params={"steps": args.steps},
         )[0]
-        print(f"[gen] 완료 ({time.time() - t0:.1f}s)")
+        gen_sec = time.time() - t0
+        print(f"[gen] 완료 ({gen_sec:.1f}s)")
 
         mesh.simplify(16777216)   # 래스터라이저 인덱스 한계
 
@@ -134,8 +136,31 @@ class Trellis2Backend(Backend):
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         glb.export(str(output_path))
-        print(f"[glb] 완료 ({time.time() - t0:.1f}s)")
+        glb_sec = time.time() - t0
+        print(f"[glb] 완료 ({glb_sec:.1f}s)")
 
+        peak = None
         if torch.cuda.is_available():
-            print(f"[mem] peak GPU {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
+            peak = round(torch.cuda.max_memory_allocated() / 1e9, 2)
+            print(f"[mem] peak GPU {peak} GB")
+
+        self.stats = {
+            "backend": self.name,
+            "model_id": args.model_id,
+            "seed": args.seed,
+            "params": {
+                "pipeline_type": args.pipeline_type,
+                "steps": args.steps,
+                "shape_guidance": args.shape_guidance,
+                "texture_size": args.texture_size,
+                "decimation_target": args.decimation_target,
+                "max_num_tokens": args.max_num_tokens,
+            },
+            "durations_sec": {
+                "load": round(load_sec, 1),
+                "generate": round(gen_sec, 1),
+                "export": round(glb_sec, 1),
+            },
+            "peak_gpu_gb": peak,
+        }
         return output_path
