@@ -118,6 +118,11 @@ def _default_render(glb: Path) -> Path:
 
 
 def main(argv=None):
+    # Triton 이 첫 실행에서 커널을 컴파일하며 Python.h 를 찾는다.
+    # gcc 가 하위 프로세스로 뜨므로 CPATH 를 미리 넣어 둔다.
+    from .buildenv import prepare
+    prepare(verbose=True)
+
     argv = list(sys.argv[1:] if argv is None else argv)
     # 서브커맨드를 생략하면 generate 로 간주한다
     if argv and argv[0] not in _SUBCOMMANDS and argv[0] not in ("-h", "--help", "--version"):

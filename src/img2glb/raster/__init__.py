@@ -31,32 +31,6 @@ _ext = None
 __all__ = ["rasterize", "rasterize_mesh", "interpolate"]
 
 
-def _find_python_headers():
-    """Python 개발 헤더 위치를 찾는다.
-
-    root 권한이 없어 ``apt install python3-dev`` 를 못 하는 환경에서는
-    deb 를 추출해 둔 경로를 ``PYDEV_INCLUDE`` 로 지정한다.
-    설치 스크립트가 저장소 루트에 만들어 두는 ``.localdev`` 도 자동으로 찾는다.
-    """
-    ver = f"python3.{sys.version_info.minor}"
-    env = os.environ.get("PYDEV_INCLUDE")
-    if env and os.path.isdir(env):
-        return env
-    # 디렉터리만 있고 Python.h 가 없는 경우가 있다 (libpython3-minimal)
-    if os.path.isfile(os.path.join("/usr/include", ver, "Python.h")):
-        return "/usr/include"
-
-    # 저장소 루트(또는 현재 디렉터리) 위쪽의 .localdev/root/usr/include
-    from pathlib import Path
-    roots = [Path.cwd(), *Path.cwd().parents,
-             *Path(__file__).resolve().parents]
-    for r in roots:
-        cand = r / ".localdev" / "root" / "usr" / "include"
-        if (cand / ver / "Python.h").is_file():
-            return str(cand)
-    return None
-
-
 def _prebuilt_is_usable():
     """설치 시 빌드된 확장을 이 환경에서 써도 되는지 확인한다.
 
@@ -119,18 +93,8 @@ def _get_ext():
             pass
 
     os.environ.setdefault("TORCH_CUDA_ARCH_LIST", _default_arch())
-
-    venv_bin = os.path.join(sys.prefix, "bin")          # ninja 가 여기에만 있을 수 있다
-    if os.path.isdir(venv_bin) and venv_bin not in os.environ.get("PATH", ""):
-        os.environ["PATH"] = venv_bin + ":" + os.environ.get("PATH", "")
-
-    inc = _find_python_headers()
-    if inc:
-        ver = f"python3.{sys.version_info.minor}"
-        want = f"{inc}/{ver}:{inc}"
-        cur = os.environ.get("CPATH", "")
-        if want not in cur:
-            os.environ["CPATH"] = want + (":" + cur if cur else "")
+    from ..buildenv import prepare
+    prepare()
 
     try:
         from torch.utils.cpp_extension import _get_build_directory

@@ -313,7 +313,14 @@ models/trellis2/.venv/bin/img2glb --image samples/bird.png
 
 ### `Python.h: No such file or directory`
 
-Python 개발 헤더가 없다. [root 권한이 없는 환경](#root-권한이-없는-환경) 참고.
+Python 개발 헤더가 없다. 확장 빌드뿐 아니라 **실행 중에도** 필요하다 —
+백엔드의 sparse conv 가 Triton 커널을 쓰는데, Triton 은 첫 실행에서
+`cuda_utils.c` 를 gcc 로 컴파일한다. 한 번 컴파일하면 `~/.triton/cache` 에
+남으므로 기존 환경에서는 드러나지 않는다.
+
+`img2glb` 는 시작할 때 헤더 경로를 찾아 `CPATH` 에 넣는다
+(`PYDEV_INCLUDE` → `/usr/include` → 저장소의 `.localdev` 순).
+못 찾으면 경고를 낸다. [root 권한이 없는 환경](#root-권한이-없는-환경) 참고.
 
 ### `Access to model ... is restricted` (403)
 
