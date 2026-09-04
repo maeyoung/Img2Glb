@@ -43,8 +43,24 @@ source models/trellis2/.venv/bin/activate
 CUDA 태그와 아키텍처는 자동 판별한다. 필요하면 지정한다.
 
 ```bash
-bash scripts/setup_trellis2.sh --cuda cu130 --arch 12.1
+bash scripts/setup_trellis2.sh --cuda cu130 --arch 12.1 --torch 2.10.0
 ```
+
+### torch 버전 고정
+
+**torch 는 `2.10.0` 으로 고정되어 있다.** 버전을 열어두면 설치 날짜에 따라
+다른 환경이 만들어져 같은 사양 PC 에서도 빌드가 깨진다.
+
+`torch 2.13` 부터 C++20 을 요구하는데, 백엔드가 쓰는 CUDA 확장
+(FlexGEMM / CuMesh / o-voxel) 은 각자 `setup.py` 에 `-std=c++17` 을
+하드코딩해 두었다. 둘이 충돌하면 이렇게 실패한다.
+
+```
+error: #error C++20 or later compatible compiler is required to use PyTorch.
+```
+
+설치 스크립트가 torch 2.13 이상을 감지하면 빌드 전에 멈추고 알려준다.
+다른 버전이 필요하면 `--torch` 로 지정하되 2.12 이하를 쓸 것.
 
 ### gated 모델 접근 승인
 

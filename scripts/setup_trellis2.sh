@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # TRELLIS.2 백엔드 설치.
 #
-#   bash scripts/setup_trellis2.sh [--cuda cu130] [--arch 12.1]
+#   bash scripts/setup_trellis2.sh [--cuda cu130] [--arch 12.1] [--torch 2.10.0]
 #
 # models/trellis2 에 저장소를 받고, CUDA 확장을 빌드하고,
 # nvdiffrast 를 img2glb.raster 로 대체하는 패치를 적용한다.
@@ -9,11 +9,18 @@ set -euo pipefail
 
 CUDA_TAG="cu130"
 ARCH=""
+# torch 2.13 부터 C++20 을 요구하는데 FlexGEMM / CuMesh / o-voxel 은
+# setup.py 에 -std=c++17 을 하드코딩해 두어 빌드가 깨진다.
+# 검증된 조합으로 고정한다. 바꾸려면 --torch / --torchvision 을 쓸 것.
+TORCH_VER="2.10.0"
+TORCHVISION_VER="0.25.0"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --cuda) CUDA_TAG="$2"; shift 2 ;;
         --arch) ARCH="$2"; shift 2 ;;
         --editable) EDITABLE=1; shift ;;
+        --torch) TORCH_VER="$2"; shift 2 ;;
+        --torchvision) TORCHVISION_VER="$2"; shift 2 ;;
         *) echo "알 수 없는 옵션: $1" >&2; exit 1 ;;
     esac
 done
@@ -39,8 +46,20 @@ fi
 VPY="$T2/.venv/bin/python"
 "$VPY" -m pip install -q --upgrade pip setuptools wheel
 
-echo "==> torch 설치 ($CUDA_TAG)"
-"$VPY" -m pip install --index-url "https://download.pytorch.org/whl/$CUDA_TAG" torch torchvision
+echo "==> torch 설치 ($CUDA_TAG, torch==$TORCH_VER)"
+"$VPY" -m pip install --index-url "https://download.pytorch.org/whl/$CUDA_TAG" \
+    "torch==$TORCH_VER" "torchvision==$TORCHVISION_VER"
+
+# 확장들이 C++17 을 전제하므로 torch 2.13+ 는 쓸 수 없다.
+"$VPY" - <<'PYCHK'
+import sys, torch
+major, minor = (int(x) for x in torch.__version__.split("+")[0].split(".")[:2])
+if (major, minor) >= (2, 13):
+    sys.exit(
+        f"\n[오류] torch {torch.__version__} 은 C++20 을 요구하는데 "
+        "FlexGEMM / CuMesh / o-voxel 은 -std=c++17 로 빌드됩니다.\n"
+        "       2.12 이하를 쓰세요:  bash scripts/setup_trellis2.sh --torch 2.10.0\n")
+PYCHK
 
 echo "==> 기본 의존성"
 "$VPY" -m pip install -q imageio imageio-ffmpeg tqdm easydict opencv-python-headless \
