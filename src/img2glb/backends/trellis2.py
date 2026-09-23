@@ -55,9 +55,32 @@ class Trellis2Backend(Backend):
                        choices=["512", "1024", "1024_cascade", "1536_cascade"],
                        help="복셀 해상도 (기본 1024_cascade 권장)")
         g.add_argument("--steps", type=int, default=12,
-                       help="샘플러 step 수 (기본 12 권장; 올리면 텍스처가 나빠진다)")
+                       help="샘플러 step 수 (전 스테이지 공통 기본값)")
+        # 아래 기본값은 TRELLIS.2 공식 데모(app.py)의 값과 일치시킨 것이다.
+        # 넘기지 않으면 샘플러 자체 기본값(guidance 3.0 / rescale 0.0 / rescale_t 1.0)이
+        # 적용되는데, 이는 저자들이 권장하는 값과 다르다.
+        g.add_argument("--ss-guidance", type=float, default=7.5,
+                       help="1단계(sparse structure) guidance strength")
+        g.add_argument("--ss-guidance-rescale", type=float, default=0.7,
+                       help="1단계 guidance rescale")
+        g.add_argument("--ss-rescale-t", type=float, default=5.0,
+                       help="1단계 timestep rescale")
         g.add_argument("--shape-guidance", type=float, default=7.5,
-                       help="형상 guidance strength")
+                       help="2단계(형상 SLat) guidance strength")
+        g.add_argument("--shape-guidance-rescale", type=float, default=0.5,
+                       help="2단계 guidance rescale")
+        g.add_argument("--shape-rescale-t", type=float, default=3.0,
+                       help="2단계 timestep rescale")
+        g.add_argument("--tex-guidance", type=float, default=1.0,
+                       help="3단계(재질/텍스처) guidance strength. 올리면 과포화된다")
+        g.add_argument("--tex-guidance-rescale", type=float, default=0.0,
+                       help="3단계 guidance rescale")
+        g.add_argument("--tex-rescale-t", type=float, default=3.0,
+                       help="3단계 timestep rescale")
+        g.add_argument("--tex-steps", type=int, default=None,
+                       help="3단계 step 수 (기본: --steps 와 동일)")
+        g.add_argument("--legacy-sampler", action="store_true",
+                       help="예전 동작으로 되돌린다 (rescale 계열을 넘기지 않음). A/B 비교용")
         g.add_argument("--texture-size", type=int, default=4096,
                        help="출력 텍스처 해상도")
         g.add_argument("--decimation-target", type=int, default=200000,
@@ -106,17 +129,41 @@ class Trellis2Backend(Backend):
         load_sec = time.time() - t0
         print(f"[load] 완료 ({load_sec:.1f}s)")
 
-        sampler = {"steps": args.steps, "guidance_strength": args.shape_guidance}
-        print(f"[gen] pipeline_type={args.pipeline_type} steps={args.steps}")
+        tex_steps = args.tex_steps if args.tex_steps is not None else args.steps
+        if args.legacy_sampler:
+            # 예전 동작: rescale 계열을 넘기지 않아 샘플러 기본값이 적용된다
+            # (텍스처 guidance 가 3.0 으로 걸린다 - 공식 권장값은 1.0)
+            _shared = {"steps": args.steps, "guidance_strength": args.shape_guidance}
+            ss_params = shape_params = _shared
+            tex_params = {"steps": tex_steps}
+        else:
+            ss_params = {"steps": args.steps,
+                         "guidance_strength": args.ss_guidance,
+                         "guidance_rescale": args.ss_guidance_rescale,
+                         "rescale_t": args.ss_rescale_t}
+            shape_params = {"steps": args.steps,
+                            "guidance_strength": args.shape_guidance,
+                            "guidance_rescale": args.shape_guidance_rescale,
+                            "rescale_t": args.shape_rescale_t}
+            tex_params = {"steps": tex_steps,
+                          "guidance_strength": args.tex_guidance,
+                          "guidance_rescale": args.tex_guidance_rescale,
+                          "rescale_t": args.tex_rescale_t}
+        print(f"[gen] pipeline_type={args.pipeline_type} steps={args.steps} "
+              f"tex_steps={tex_steps} "
+              f"{'(legacy 샘플러)' if args.legacy_sampler else ''}")
+        print(f"[gen] tex: guidance={tex_params.get('guidance_strength', '기본3.0')} "
+              f"rescale={tex_params.get('guidance_rescale', '기본0.0')} "
+              f"rescale_t={tex_params.get('rescale_t', '기본1.0')}")
         t0 = time.time()
         torch.manual_seed(args.seed)
         mesh = pipeline.run(
             image, seed=args.seed,
             pipeline_type=args.pipeline_type,
             max_num_tokens=args.max_num_tokens,
-            sparse_structure_sampler_params=sampler,
-            shape_slat_sampler_params=sampler,
-            tex_slat_sampler_params={"steps": args.steps},
+            sparse_structure_sampler_params=ss_params,
+            shape_slat_sampler_params=shape_params,
+            tex_slat_sampler_params=tex_params,
         )[0]
         gen_sec = time.time() - t0
         print(f"[gen] 완료 ({gen_sec:.1f}s)")

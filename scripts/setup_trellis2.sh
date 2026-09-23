@@ -14,6 +14,13 @@ ARCH=""
 # 검증된 조합으로 고정한다. 바꾸려면 --torch / --torchvision 을 쓸 것.
 TORCH_VER="2.10.0"
 TORCHVISION_VER="0.25.0"
+
+# 업스트림 커밋을 고정한다. apply_patches.py 는 문자열 치환으로 패치하므로
+# 업스트림이 해당 파일을 고치면 패치가 실패한다. 아래는 검증된 조합이다.
+# 올릴 때는 커밋을 바꾸고 전체 설치를 다시 검증할 것.
+TRELLIS2_COMMIT="75fbf0183001ed9876c8dbb35de6b68552ee08bd"
+FLEXGEMM_COMMIT="6dd94a859c26ee8246888502eada3dd8ad85532e"
+CUMESH_COMMIT="12289e1062f0603f2f0d0771b02e1395d247f26f"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --cuda) CUDA_TAG="$2"; shift 2 ;;
@@ -33,11 +40,12 @@ PY="${PYTHON:-python3}"
 mkdir -p "$MODELS"
 if [[ ! -d "$T2" ]]; then
     echo "==> TRELLIS.2 저장소 clone"
-    git clone --recursive https://github.com/microsoft/TRELLIS.2.git "$T2"
-else
-    echo "==> 기존 저장소 사용: $T2"
-    git -C "$T2" submodule update --init --recursive
+    git clone https://github.com/microsoft/TRELLIS.2.git "$T2"
 fi
+echo "==> TRELLIS.2 커밋 고정: ${TRELLIS2_COMMIT:0:12}"
+git -C "$T2" fetch --quiet origin "$TRELLIS2_COMMIT" 2>/dev/null || git -C "$T2" fetch --quiet origin
+git -C "$T2" checkout --quiet "$TRELLIS2_COMMIT"
+git -C "$T2" submodule update --init --recursive
 
 if [[ ! -d "$T2/.venv" ]]; then
     echo "==> venv 생성"
@@ -96,9 +104,17 @@ echo "==> CUDA arch: $ARCH"
 echo "==> CUDA 확장 빌드 (FlexGEMM, CuMesh, o-voxel)"
 mkdir -p "$T2/extensions"
 for repo in FlexGEMM CuMesh; do
-    [[ -d "$T2/extensions/$repo" ]] || \
-        git clone --recursive --depth 1 "https://github.com/JeffreyXiang/$repo.git" "$T2/extensions/$repo"
-    ( cd "$T2/extensions/$repo" && \
+    case "$repo" in
+        FlexGEMM) commit="$FLEXGEMM_COMMIT" ;;
+        CuMesh)   commit="$CUMESH_COMMIT" ;;
+    esac
+    dir="$T2/extensions/$repo"
+    [[ -d "$dir" ]] || git clone "https://github.com/JeffreyXiang/$repo.git" "$dir"
+    git -C "$dir" fetch --quiet origin "$commit" 2>/dev/null || git -C "$dir" fetch --quiet origin
+    git -C "$dir" checkout --quiet "$commit"
+    git -C "$dir" submodule update --init --recursive
+    echo "    $repo @ ${commit:0:12}"
+    ( cd "$dir" && \
       TORCH_CUDA_ARCH_LIST="$ARCH" MAX_JOBS="${MAX_JOBS:-8}" "$VPY" -m pip install . --no-build-isolation )
 done
 ( cd "$T2/o-voxel" && \
